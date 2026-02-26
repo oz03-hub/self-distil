@@ -1,0 +1,8 @@
+.env
+__pycache*
+*.pyc
+.vscode/
+*.pth
+data/
+logs/
+wandb/
