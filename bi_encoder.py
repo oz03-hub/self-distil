@@ -10,7 +10,7 @@ Your insight is: the positive document itself can serve as a proxy for the query
 
 
 class BiEncoder(nn.Module):
-    def __init__(self, model_name="sentence-transformers/all-MiniLM-L6-v2", temperature=0.05):
+    def __init__(self, model_name="sentence-transformers/all-MiniLM-L6-v2", temperature=0.1):
         super(BiEncoder, self).__init__()
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -102,4 +102,5 @@ class BiEncoder(nn.Module):
         """
         cl = self.contrastive_loss(query_embs, doc_embs)
         dl = self.distillation_loss(query_embs, doc_embs)
-        return alpha * cl + beta * dl, cl, dl
+        return alpha * cl + beta * dl, cl, dl # for some reason cl and dl are almost the same, at least with BGE it was
+
