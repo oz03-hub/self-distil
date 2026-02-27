@@ -3,14 +3,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-"""
-In standard contrastive learning (e.g., InfoNCE), you treat every non-paired document in the batch as a hard negative. But this is a false negative problem: some of those "negatives" might actually be relevant to the query. You're penalizing the model for scoring them highly, which introduces noisy gradients.
-Your insight is: the positive document itself can serve as a proxy for the query's intent. If the positive document is semantically similar to another document in the batch, that other document is probably also somewhat relevant to the query. So instead of forcing the query to push all non-paired documents to zero similarity, you should let the document-document similarity structure act as a soft label distribution.
-"""
-
 
 class BiEncoder(nn.Module):
-    def __init__(self, model_name="sentence-transformers/all-MiniLM-L6-v2", temperature=0.1):
+    def __init__(
+        self, model_name="sentence-transformers/all-MiniLM-L6-v2", temperature=0.1
+    ):
         super(BiEncoder, self).__init__()
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -24,7 +21,9 @@ class BiEncoder(nn.Module):
         return (token_embs * mask_expanded).sum(dim=1) / mask_expanded.sum(dim=1)
 
     def _encode(self, encoder, texts):
-        inputs = self.tokenizer(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
+        inputs = self.tokenizer(
+            texts, padding=True, truncation=True, max_length=512, return_tensors="pt"
+        )
         inputs = {k: v.to(next(encoder.parameters()).device) for k, v in inputs.items()}
         output = encoder(**inputs)
         embs = self._mean_pool(output, inputs["attention_mask"])
@@ -64,7 +63,9 @@ class BiEncoder(nn.Module):
         qd_scores = torch.matmul(query_embs, doc_embs.T) / self.temperature
 
         labels = torch.arange(qd_scores.size(0), device=qd_scores.device)
-        return F.cross_entropy(qd_scores, labels) # diagonals are positive targets, should get highest p
+        return F.cross_entropy(
+            qd_scores, labels
+        )  # diagonals are positive targets, should get highest p
 
     def distillation_loss(self, query_embs, doc_embs):
         """
@@ -85,7 +86,9 @@ class BiEncoder(nn.Module):
         # (B, B) query-document similarity — student signal
         qd_scores = torch.matmul(query_embs, doc_embs.T) / self.temperature
 
-        teacher_dist = F.softmax(dd_scores, dim=-1).detach() # Use model itself as the teacher to generate soft labels, detach gradient
+        teacher_dist = (
+            F.softmax(dd_scores, dim=-1).detach()
+        )  # Use model itself as the teacher to generate soft labels, detach gradient
         student_log_dist = F.log_softmax(qd_scores, dim=-1)
 
         return F.kl_div(student_log_dist, teacher_dist, reduction="batchmean")
@@ -102,5 +105,8 @@ class BiEncoder(nn.Module):
         """
         cl = self.contrastive_loss(query_embs, doc_embs)
         dl = self.distillation_loss(query_embs, doc_embs)
-        return alpha * cl + beta * dl, cl, dl # for some reason cl and dl are almost the same, at least with BGE it was
-
+        return (
+            alpha * cl + beta * dl,
+            cl,
+            dl,
+        )  # for some reason cl and dl are almost the same, at least with BGE it was
